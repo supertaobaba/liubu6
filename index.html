@@ -1,0 +1,326 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>COG-MAP | 个人认知与心理韧性评估报告</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js" defer></script>
+    
+    <style>
+        :root {
+            --bg: #050508;
+            --card: rgba(12, 12, 20, 0.98);
+            --accent: #a29bfe;
+            --glow: #6c5ce7;
+            --text-p: #d1d1d1;
+            --text-h: #ffffff;
+        }
+        body {
+            background: var(--bg);
+            background-image: radial-gradient(circle at 50% 50%, #1a1a2e 0%, #050508 100%);
+            color: var(--text-p);
+            font-family: 'PingFang SC', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+        #app {
+            width: 92%;
+            max-width: 800px;
+            background: var(--card);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.8);
+            position: relative;
+            box-sizing: border-box;
+        }
+        .progress-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent), var(--glow));
+            box-shadow: 0 0 15px var(--glow);
+            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .meta-info { font-size: 0.7rem; color: var(--accent); letter-spacing: 3px; margin-bottom: 20px; text-transform: uppercase; font-weight: bold; opacity: 0.8;}
+        .question-box { animation: fadeIn 0.4s ease-out; }
+        .question-text { font-size: 1.3rem; color: var(--text-h); line-height: 1.5; margin-bottom: 30px; min-height: 70px; font-weight: 300; }
+        .options-grid { display: grid; gap: 12px; }
+        .opt-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 16px 20px;
+            color: var(--text-p);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+            border-radius: 10px;
+            font-size: 1rem;
+            user-select: none;
+        }
+        .opt-btn:active, .opt-btn:hover {
+            background: rgba(108, 92, 231, 0.25);
+            border-color: var(--accent);
+            color: #fff;
+            transform: translateY(-2px);
+        }
+        #result-area { display: none; }
+        .res-header { border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-bottom: 25px; text-align: center; }
+        .big-score { font-size: 4.5rem; font-weight: 100; color: var(--accent); margin: 5px 0; letter-spacing: -2px; }
+        .chart-wrapper { width: 100%; max-width: 380px; margin: 20px auto; background: rgba(255,255,255,0.02); border-radius: 50%; padding: 15px; }
+        .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .analysis-card { background: rgba(255,255,255,0.02); padding: 15px; border-radius: 8px; }
+        .analysis-card h4 { color: var(--accent); margin: 0 0 8px 0; font-size: 0.8rem; letter-spacing: 1px; }
+        .analysis-card p { font-size: 0.85rem; line-height: 1.6; color: #aaa; margin: 0; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .btn-retry { margin-top: 30px; width: 100%; padding: 16px; background: transparent; border: 1px solid var(--accent); color: var(--accent); cursor: pointer; border-radius: 10px; font-weight: bold; transition: 0.3s; }
+        .btn-retry:hover { background: var(--accent); color: #000; }
+        @media (max-width: 600px) {
+            #app { padding: 25px 20px; }
+            .analysis-grid { grid-template-columns: 1fr; gap: 12px; }
+            .question-text { font-size: 1.15rem; }
+            .big-score { font-size: 3.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div class="progress-line" id="bar"></div>
+    
+    <div id="quiz-view">
+        <div class="meta-info" id="q-meta">SYSTEM INITIALIZING...</div>
+        <div class="question-box">
+            <div class="question-text" id="q-text">Loading Assessment...</div>
+            <div class="options-grid" id="opts"></div>
+        </div>
+    </div>
+
+    <div id="result-area">
+        <div class="res-header">
+            <div class="meta-info">ASSESSMENT COMPLETE</div>
+            <div class="big-score" id="avg-score">0</div>
+            <div id="status-title" style="font-size: 1.1rem; color: #fff; letter-spacing: 2px;"></div>
+        </div>
+        
+        <div class="chart-wrapper">
+            <canvas id="radarChart"></canvas>
+        </div>
+        
+        <div class="analysis-grid">
+            <div class="analysis-card"><h4>综合评估</h4><p id="p-base"></p></div>
+            <div class="analysis-card"><h4>突出优势</h4><p id="p-strength"></p></div>
+            <div class="analysis-card"><h4>核心短板</h4><p id="p-weakness"></p></div>
+            <div class="analysis-card"><h4>破局指引</h4><p id="p-guide"></p></div>
+        </div>
+        
+        <button class="btn-retry" onclick="location.reload()">重新开启测评</button>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const data = [
+            { d: 0, q: "当你的核心专业判断在公开场合被毫无逻辑地全盘否定时，你的真实反应更倾向于？", a: [["表面暂时隐忍或妥协，事后陷入较长时间的心理内耗与自我怀疑", 20], ["感到强烈的被冒犯感，出于防御本能立刻打断并强势反驳", 150], ["迅速剥离个人情绪，要求对方立刻提供具体的数据或事实依据", 400], ["视其为暴露认知盲区的契机，平静剥离对方表达中的情绪，提取有效信息", 600]] },
+            { d: 0, q: "面对极其突然的、可能改变职业路径的转折点危机？", a: [["极度惊恐，不知所措，担心不可控的后果", 100], ["感到被环境或体制针对，意志消沉，无力反抗", 50], ["客观评估沉没成本，迅速寻找补救转机", 310], ["全然接纳现实，顺应周期规律调整战略布局", 540]] },
+            { d: 0, q: "在多线程并行且外界干扰极大（如消息不断、环境嘈杂）的高压状态下，你的工作效能变化是？", a: [["注意力被严重撕裂，情绪烦躁，导致整体进度断崖式下跌", 150], ["感到明显的疲惫感，只能机械性地先处理不需要动脑的琐事", 50], ["通过物理隔绝或心理暗示，强制自己按部就班推进最高优先级任务", 400], ["几乎不受外界干扰，能在高压乱局中迅速理清脉络，切入深度工作", 540]] },
+            { d: 0, q: "当你发现自己在项目中犯了一个不可挽回的重大错误？", a: [["长时间陷入自责，害怕被清算，试图掩盖", 30], ["急于推卸部分责任或寻找客观理由", 100], ["第一时间公开并客观面对，主动承担后果并提出补救方案", 350], ["将其沉淀为系统的风控经验，视为认知升级的必经反馈", 500]] },
+            { d: 0, q: "面对网络或行业内的恶意攻击与误解？", a: [["感到委屈与自我怀疑，长时间无法释怀", 75], ["愤怒反击，试图通过自证清白来赢回局面", 150], ["不在意，明白那只是群体情绪的无理性宣泄", 250], ["具有宏观同理心，理解不同阶层视角的认知局限性", 500]] },
+            { d: 0, q: "看到能力平庸但凭借投机取巧获得巨大资源的人？", a: [["感到强烈的嫉妒与社会规则不公", 150], ["漠不关心，认为与自己的赛道无关", 250], ["冷眼旁观，客观分析其利益交换的底层商业逻辑", 400], ["理解社会生态的多样性，清楚每种模式背后都有其长效代价", 540]] },
+            { d: 0, q: "处在高度内卷与竞争的压力环境中，你的状态？", a: [["被同侪压力折磨得焦虑不安，害怕落后", 125], ["感到被迫参与的疲惫感，产生严重的职业倦怠", 75], ["享受博弈过程，在挑战中不断优化自己的策略", 310], ["在竞争中保持战略定力，专注于打造自己的核心护城河", 400]] },
+            { d: 0, q: "在一段独处的低谷期，脑海浮现过去的挫败经历？", a: [["反复咀嚼失败的痛苦，深陷负面情绪循环", 75], ["试图通过高频娱乐、社交或工作来麻痹自己", 100], ["以第三人称视角审视情绪的起伏，任其自然消散", 400], ["深度复盘，将其转化为优化心智模型的原始数据", 600]] },
+            { d: 0, q: "面对行业周期下行或突发的宏观负面新闻，你的反应？", a: [["只要火没烧到自己身上，就暗自庆幸", 125], ["陷入极度的悲观与宏观绝望感，停止一切投入", 100], ["理性分析趋势，思考如何在危机中寻找对冲策略", 400], ["产生责任感，思考如何以自身能力为系统提供建设性支持", 500]] },
+            { d: 0, q: "如果在关键时刻，只要稍微违背职业操守就能换取巨大收益？", a: [["内心煎熬，但在巨大的诱惑下大概率会妥协", 125], ["抱有侥幸心理，认为“成大事者不拘小节”", 175], ["通过权衡利弊与长远风险，最终选择放弃", 200], ["底线极其清晰，毫不犹豫地拒绝，且内心毫无波澜", 400]] },
+            
+            { d: 1, q: "当你深信不疑的经验被最新的数据模型强力反驳时？", a: [["感到经验权威被挑战，本能地排斥新数据", 100], ["固执己见，试图找出数据的漏洞来为自己辩护", 150], ["客观评估数据的有效性，迅速修正自己的认知偏差", 400], ["为能及时发现并纠正系统性逻辑错误而感到庆幸", 540]] },
+            { d: 1, q: "关于“数据逻辑”与“直觉预判”，你在决策中的比重是？", a: [["极度排斥直觉，必须有100%严谨的数据才敢做决定", 400], ["数据太繁琐，更多依赖过往经验和感性直觉", 250], ["以数据逻辑作为风控底线，以直觉作为创新突破口", 500], ["两者在高度复杂的灰度决策中已形成无缝协同", 600]] },
+            { d: 1, q: "面对未经验证的前沿理论或极具争议的商业模式？", a: [["带着傲慢的偏见全盘否定", 175], ["容易被包装宏大的概念洗脑，盲目跟风跟投", 125], ["保持“假设-求证”的理性态度，进行小规模测试", 400], ["试图穿透表象，探究其是否符合更底层的客观经济规律", 600]] },
+            { d: 1, q: "在复盘复杂项目失败的原因时，你的探究深度是？", a: [["只关注表层原因，听从让自己心理好受的解释", 125], ["觉得追责毫无意义，只想赶紧翻篇", 50], ["不顾情面，层层剥茧地探寻最客观的事实与数据链", 400], ["不仅关注事实，更能洞察多方利益博弈带来的系统性必然", 600]] },
+            { d: 1, q: "关于个人努力与最终结果的关系，你更倾向于认为？", a: [["大部分都是运气，阶层固化导致努力无用", 75], ["只要足够拼命，就一定能获得等额的回报", 100], ["这是一个多维变量共同作用的概率系统", 400], ["事物发展遵循系统演化规律，做正确的事并接受任何结果", 540]] },
+            { d: 1, q: "你如何处理每天海量、碎片化且真假参半的信息源？", a: [["感到严重的信息焦虑与注意力涣散", 100], ["只被算法投喂，沉溺于满足即时多巴胺的内容", 125], ["建立了严格的信息过滤漏斗与高质量信源库", 400], ["能从繁杂的噪音中瞬间捕捉到具有前瞻性的关键信号", 540]] },
+            { d: 1, q: "看待行业传统与资深权威的态度？", a: [["缺乏主见，对其观点盲目服从与崇拜", 100], ["为了彰显个性，本能地采取逆反和对抗姿态", 150], ["取其精华，用批判性思维理性解构其适用边界", 400], ["深刻理解其在特定历史阶段形成的合理性及必然衰退", 500]] },
+            { d: 1, q: "在你的价值体系中，如何定义真正的“成功”？", a: [["占有尽可能多的物质资源和社会头衔", 125], ["获得圈层内的高度认可、羡慕与赞美", 175], ["实现个人心智模型的不断迭代与认知闭环", 400], ["在实现自身价值的同时，能够持续赋能他人与社会", 540]] },
+            { d: 1, q: "你如何理解商业社会的运转逻辑？", a: [["完全是弱肉强食、零和博弈的黑暗森林", 175], ["枯燥的报表、数字和冷冰冰的合同组合", 250], ["资源有效配置与价值等价交换的理性工具", 400], ["复杂群体协作与信任共识建立的演化系统", 500]] },
+            { d: 1, q: "在制定未来的长期战略计划时，你通常？", a: [["被未知的变数吓倒，瞻前顾后难以推进", 100], ["目标极其宏大激进，但缺乏风控与落地细节", 125], ["逻辑缜密，具备多层级的风险预案与沙盘推演", 350], ["设定清晰的方向愿景，但在战术执行上保持极度敏捷灵活", 500]] },
+            
+            { d: 2, q: "当你的核心提议被团队成员嗤之以鼻时？", a: [["感到威信受挫，试图通过职权或提高音量压制对方", 175], ["表面不争论，但内心将其划入“黑名单”，减少合作", 150], ["立刻反思自己的论证过程是否存在逻辑硬伤", 400], ["理解对方视角与利益诉求的不同，寻找共识交集", 500]] },
+            { d: 2, q: "在深度绑定的合作关系中，如果合伙人表现让你失望？", a: [["采取冷暴力，或通过制造内疚感来道德绑架对方", 30], ["情绪爆发，强硬要求对方按照自己的标准改变", 150], ["进行透明且高频的沟通，寻找建设性的系统调整方案", 350], ["客观评估对方的局限性，调整预期，在各自优势区重新适配", 500]] },
+            { d: 2, q: "看到团队中某个基层员工陷入严重的业务困境？", a: [["怕被其拖累绩效，尽量撇清关系", 100], ["觉得事不关己，保持冷漠的旁观态度", 50], ["在不影响自身核心KPI的前提下，提供方法论指导", 310], ["出于团队整体效能最大化的考量，主动投入资源助其破局", 540]] },
+            { d: 2, q: "如果你的管理职位被一个资历远浅于你的年轻人取代？", a: [["感到强烈的屈辱感，试图在背后制造阻力或离职", 150], ["自信心受严重打击，进入长时间的“躺平”状态", 75], ["平静交接，重新评估自身的市场核心竞争力", 310], ["以开放的心态协助对方，并为组织的年轻化迭代感到欣慰", 500]] },
+            { d: 2, q: "你平时对同事或下属的评价习惯是？", a: [["习惯性地盯着缺点，经常进行负面挑剔与打压", 175], ["保持社交距离，信奉“看破不说破”的职场明哲保身", 250], ["基于客观业绩与事实，提供有建设性的反馈与赞赏", 400], ["善于发现并激发他人连自己都没意识到的潜能与核心优势", 540]] },
+            { d: 2, q: "在关乎存亡的重点项目中，同伴犯了致命的低级错误？", a: [["第一时间在公开场合指责对方，彻底撇清自身责任", 150], ["感到崩溃绝望，抱怨自己遇人不淑", 75], ["迅速叫停指责，聚焦于共同控制损失与复盘解决方案", 350], ["以极大的包容心稳住对方情绪，借此重塑团队的抗压凝聚力", 500]] },
+            { d: 2, q: "面对在职场中曾经恶意给你“穿小鞋”的人，你的态度？", a: [["将其视为死敌，时刻寻找机会在背后捅刀子报复", 150], ["产生严重的职场恐惧，尽量躲避，导致自身发展受限", 100], ["将其视为纯粹的利益博弈方，保持警惕但不再内耗", 250], ["视其为提升自身政治智慧与反脆弱能力的极佳陪练", 500]] },
+            { d: 2, q: "作为项目核心主导者，你的沟通风格通常表现为？", a: [["为了维持表面一团和气，委婉讨好，不敢拍板", 30], ["极度强势且具攻击性，必须所有人绝对服从", 150], ["指令清晰、逻辑严密、高度注重沟通效率与闭环", 400], ["温和且坚定，既有清晰的边界感，又能传递强大的定海神针效用", 500]] },
+            { d: 2, q: "在处理跨部门利益冲突时，你的第一反应？", a: [["推诿扯皮，坚决捍卫本部门的一亩三分地", 100], ["嫌麻烦，为了息事宁人轻易让渡本部门核心利益", 50], ["拿着流程和制度据理力争，寻求公平的利益切割", 310], ["跳出零和博弈，寻找能够做大蛋糕的第三种多赢方案", 500]] },
+            { d: 2, q: "当你在一个地位极其显赫、大佬云集的圈层中交流时？", a: [["感到强烈的阶层落差，自惭形秽，局促不安", 75], ["为了掩饰自卑，拼命输出观点，试图证明自己的价值", 175], ["坦然自若，保持不卑不亢的平等交流与倾听学习", 400], ["完全无视身份标签的束缚，仅专注于事情和认知层面的碰撞", 540]] },
+            
+            { d: 3, q: "你如何看待“金钱资源”在你生命周期中的角色？", a: [["缺乏安全感，认为它是生存的唯一指望", 100], ["用来彰显阶层地位、购买他人尊重的虚荣勋章", 175], ["衡量个人社会价值输出与信用累积的客观刻度", 400], ["撬动更大社会资源、实现长远愿景的杠杆工具", 540]] },
+            { d: 3, q: "当你发现自己在行业内的核心技能正逐渐被AI或年轻人淘汰？", a: [["陷入极度的年龄焦虑与职业恐慌，抗拒变化", 100], ["消极悲观，认为大势已去，准备随便找个闲职混日子", 75], ["理性接纳技术迭代，迅速重塑自己的第二增长曲线", 400], ["平静地完成角色转型，将重心从“技能输出”转向“智慧与格局输出”", 600]] },
+            { d: 3, q: "你认为长期的职业或人生意义更倾向于？", a: [["生活只是无尽的劳作与账单，谈不上任何意义", 50], ["建立世俗眼中的巨大功业，获得极高声望与权力", 175], ["不断探索事物的底层规律，实现自我认知的终极圆满", 400], ["在体验各种经历的同时，对社会或他人产生深远的正面影响", 500]] },
+            { d: 3, q: "当你在极度繁忙的工作间隙，偶然独处面对大自然（如看海）时？", a: [["只觉得无聊，满脑子还是未回复的工作邮件", 100], ["单纯觉得风景不错，拍个照发朋友圈放松一下", 250], ["感受到自然系统运作规律的精妙，引发对商业生态的类比思考", 400], ["体会到个体的渺小与万物的广袤，获得一种深刻的内在宁静感", 600]] },
+            { d: 3, q: "在创业或独立负责重要项目时，对于“深度孤独”的真实体验是？", a: [["感到无人理解、被群体抛弃的深度恐惧与煎熬", 100], ["通过频繁参加无意义的应酬或忙碌来逃避这种感觉", 125], ["将其视为自我对话、深度复盘与心智修复的高效期", 400], ["享受这种状态，认为这是进行颠覆性深度思考的必要环境", 600]] },
+            
+            { d: 4, q: "如果在体检中被误诊为绝症，在等待复查的那一周，你内心的最深处？", a: [["惊恐崩溃，觉得天塌下来了，完全无法正常生活", 100], ["充满极度的怨恨与遗憾，觉得人生太多物质享受没体验够", 125], ["迅速安排好遗嘱与工作交接，理性面对各种可能性", 350], ["平静地审视生命，反而获得了前所未有的澄明与对当下的珍视", 600]] },
+            { d: 4, q: "如果你能对十年前那个一无所有、四处碰壁的自己说一句话？", a: [["恨铁不成钢，责怪当时为什么那么蠢走弯路", 30], ["功利地告诉他几个暴富的风口，让他赶紧去搞钱", 125], ["温和地告诉他：我接纳你的所有青涩，那些挫折成就了现在的我", 500], ["无需多言，深知一切皆是过程，专注当下的行动即可", 600]] },
+            { d: 4, q: "看待“人文与艺术”等非实用学科在你生活中的最高价值？", a: [["吃饱饭没事干的文人用来打发时间的消遣", 250], ["用来包装人设、彰显高级品位和进行高端社交的资本", 175], ["能够大幅提升个人的认知维度、审美能力与创造力底蕴", 400], ["对抗工具理性异化、保持人类精神独立与同理心的终极防线", 600]] },
+            { d: 4, q: "关于内心对“自由”的终极渴望，你认为它来源于？", a: [["实现彻底的财务自由，买东西不用看价格标签", 125], ["拥有绝对的权力，不用再看任何人的脸色行事", 150], ["对客观事物发展规律的深刻认知与顺应（所谓“从心所欲不逾矩”）", 400], ["建立起一套绝对独立、超脱于外界评价与世俗定义的自洽系统", 600]] },
+            { d: 4, q: "在职业生涯或人生的最后阶段回顾一生？", a: [["对未完成的欲望、未赚到的钱充满执念与不甘", 100], ["客观总结自己创造的商业与社会价值，并安详地面对退休/谢幕", 400], ["在内心的绝对平静中微笑回顾，坦然交出接力棒", 600], ["坚信自己的某种精神特质或认知体系，已化为长久的社会传承", 700]] }
+        ];
+
+        let current = 0;
+        let dimScores = [0, 0, 0, 0, 0];
+        let dimCounts = [0, 0, 0, 0, 0];
+
+        const qText = document.getElementById('q-text');
+        const opts = document.getElementById('opts');
+        const qMeta = document.getElementById('q-meta');
+        const bar = document.getElementById('bar');
+        
+        const dims = ["压力韧性", "认知逻辑", "社交协同", "价值导向", "综合效能"];
+
+        function loadQ() {
+            if (current >= data.length) {
+                showResult();
+                return;
+            }
+            const item = data[current];
+            qMeta.innerText = `DIMENSION: ${dims[item.d]} (${current + 1}/${data.length})`;
+            qText.innerText = item.q;
+            bar.style.width = ((current + 1) / data.length * 100) + "%";
+            
+            opts.innerHTML = '';
+            
+            // 每次打乱选项顺序
+            const shuffled = [...item.a].sort(() => Math.random() - 0.5);
+            shuffled.forEach(ans => {
+                const btn = document.createElement('div');
+                btn.className = 'opt-btn';
+                btn.innerText = ans[0];
+                btn.onclick = () => {
+                    dimScores[item.d] += ans[1];
+                    dimCounts[item.d]++;
+                    current++;
+                    loadQ();
+                };
+                opts.appendChild(btn);
+            });
+        }
+
+        function showResult() {
+            document.getElementById('quiz-view').style.display = 'none';
+            document.getElementById('result-area').style.display = 'block';
+
+            // 计算5个维度的独立得分与平均分
+            const finalDims = dimScores.map((s, i) => Math.round(s / (dimCounts[i] || 1)));
+            const avg = Math.round(finalDims.reduce((a, b) => a + b) / 5);
+            document.getElementById('avg-score').innerText = avg;
+
+            // 渲染真实的五边形雷达图
+            const renderChart = () => {
+                if (typeof Chart === 'undefined') {
+                    setTimeout(renderChart, 100);
+                    return;
+                }
+                new Chart(document.getElementById('radarChart'), {
+                    type: 'radar',
+                    data: {
+                        labels: dims,
+                        datasets: [{
+                            data: finalDims,
+                            backgroundColor: 'rgba(162, 155, 254, 0.2)',
+                            borderColor: '#a29bfe',
+                            borderWidth: 2,
+                            pointRadius: 3
+                        }]
+                    },
+                    options: {
+                        scales: { r: { min: 0, max: 700, ticks: { display: false }, grid: { color: 'rgba(255,255,255,0.1)' }, angleLines: { color: 'rgba(255,255,255,0.1)' } } },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            };
+            renderChart();
+
+            // 动态分析算法接入
+            const r = getAnalysis(avg, finalDims);
+            
+            document.getElementById('status-title').innerText = r.title;
+            document.getElementById('p-base').innerText = r.base;
+            document.getElementById('p-strength').innerText = r.strength;
+            document.getElementById('p-weakness').innerText = r.weakness;
+            document.getElementById('p-guide').innerText = r.guide;
+        }
+
+        function getAnalysis(avg, finalDims) {
+            const dimsArr = ["压力韧性", "认知逻辑", "社交协同", "价值导向", "综合效能"];
+            
+            // 动态找出用户的最高分和最低分维度
+            let maxIdx = finalDims.indexOf(Math.max(...finalDims));
+            let minIdx = finalDims.indexOf(Math.min(...finalDims));
+            
+            // 如果所有分数都一样，做一下防错处理
+            if (maxIdx === minIdx) {
+                minIdx = (maxIdx + 1) % 5;
+            }
+            
+            // 专属优势话术库
+            const strengths = [
+                "【压力韧性】具备极强的情绪稳定性和抗压阈值，能在危机与高压中迅速剥离情绪，保持冷静决策。",
+                "【认知逻辑】拥有缜密的深度思考能力，善于打破信息茧房，从复杂表象中抽离出底层的客观规律。",
+                "【社交协同】具备极高的同理心与沟通效能，能够向下兼容，高效整合人际网络与团队核心资源。",
+                "【价值导向】拥有清晰且坚定的长期主义锚点，内驱力极强，不易被短期利益诱惑或外界评价动摇。",
+                "【综合效能】具有卓越的“知行合一”特质，能将高维认知迅速转化为实际的执行反馈，实现完美闭环。"
+            ];
+            
+            // 专属短板话术库
+            const weaknesses = [
+                "【压力韧性】情绪内核相对脆弱，面对突发变故或公然的负面评价时，易产生较大的心理内耗与防御反应。",
+                "【认知逻辑】思维偶尔会受主观经验或情绪干扰，在处理高度复杂或模糊边界的信息时，缺乏系统性解构框架。",
+                "【社交协同】人际边界感把握不够精准，或防御心过重，在深度的团队协作中容易产生隐性摩擦或走向孤立。",
+                "【价值导向】偶尔缺乏明确的长期战略定力，决策易受外界大环境影响，在长期逆境中容易产生职业虚无感。",
+                "【综合效能】存在一定程度的认知与执行脱节现象，想法多于行动，在资源落地和最终结果交付上欠缺火候。"
+            ];
+
+            // 根据综合平均分判定总评层级
+            let title = "", base = "";
+            if (avg < 150) { 
+                title = "情绪驱动型"; 
+                base = "情绪感知极其敏锐，但整体效能极易受外界负面反馈和环境压力的干扰，心智模型常处于被动的防御状态，容易陷入心理内耗。"; 
+            } else if (avg < 250) { 
+                title = "保守防御型"; 
+                base = "具备基础的职业规则意识，在熟悉且低风险的环境中能保持稳定。但在面对高度不确定性、突发危机或强竞争时，倾向于退缩与妥协。"; 
+            } else if (avg < 350) { 
+                title = "经验执行型"; 
+                base = "能较好地适应既定的职场与社会规则，具备不错的抗压能力、执行韧性与职业素养。但思维有时容易陷入线性逻辑，缺乏灰度认知。"; 
+            } else if (avg < 450) { 
+                title = "理性架构型"; 
+                base = "拥有独立客观的逻辑体系，能够敏锐剥离个人情绪，极度理性地处理复杂多变的人生与职场课题。擅长在混乱中建立系统与秩序。"; 
+            } else if (avg < 550) { 
+                title = "敏捷协同型"; 
+                base = "具备极强的认知弹性与适应力，能在高压和不确定性中保持内核的绝对稳定与自洽。具有跨界整合资源、带动周围群体产生正向改变的潜力。"; 
+            } else { 
+                title = "卓越领航型"; 
+                base = "彻底突破了传统的零和竞争与博弈思维，生命状态高度自洽且从容。能够精准洞察底层演化规律，成为愿景的定义者与极具利他精神的长期主义者。"; 
+            }
+
+            return {
+                title: title,
+                base: base,
+                strength: strengths[maxIdx],
+                weakness: weaknesses[minIdx],
+                guide: `优先修补您的【${dimsArr[minIdx]}】短板以减少潜在内耗。同时，请将您突出的【${dimsArr[maxIdx]}】优势最大化运用到核心业务与日常协作中，以此建立正向的个人效能飞轮。`
+            };
+        }
+
+        loadQ();
+    });
+</script>
+</body>
+</html>
